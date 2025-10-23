@@ -1,42 +1,39 @@
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* styles/globals.css */
 
 html,
 body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
+  background-color: #f9fafb;
+  color: #111;
+  font-family: "Inter", system-ui, sans-serif;
 }
 
 * {
   box-sizing: border-box;
-  padding: 0;
-  margin: 0;
 }
 
 a {
-  color: inherit;
+  color: #1c91ff;
   text-decoration: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
+a:hover {
+  text-decoration: underline;
+}
+
+/* For Mantine + Next consistency */
+button {
+  font-family: inherit;
+}
+
+nav a {
+  color: #333;
+  padding: 8px 0;
+  display: block;
+  transition: color 0.2s ease;
+}
+
+nav a:hover {
+  color: #1c91ff;
 }
