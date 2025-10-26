@@ -158,6 +158,7 @@ export default function DashboardLayout({
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch
                 onClick={handleNavClick}
                 style={{
                   textDecoration: "none",
