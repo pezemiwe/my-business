@@ -31,21 +31,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data, error } = await supabase
-    .from("purchases")
-    .select(
-      `
-    id,
-    quantity,
-    total_cost,
-    date,
-    created_at,
-    products (
-      name
-    )
-  `
-    )
+    .from("expense_categories")
+    .select("id, name")
     .eq("user_id", user.id)
-    .order("date", { ascending: false });
+    .order("name", { ascending: true });
 
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -60,29 +49,49 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
-  const { product_id, quantity, total_cost, date } = body;
+  const { name } = body;
 
-  if (!product_id || !quantity || !total_cost) {
+  if (!name || !name.trim()) {
     return NextResponse.json(
-      { error: "Missing required fields" },
+      { error: "Category name is required" },
       { status: 400 }
     );
   }
 
+  // Check if category already exists for this user
+  const { data: existingCategory } = await supabase
+    .from("expense_categories")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("name", name.trim())
+    .single();
+
+  if (existingCategory) {
+    return NextResponse.json(
+      { error: "Category already exists" },
+      { status: 409 }
+    );
+  }
+
   const { data, error } = await supabase
-    .from("purchases")
+    .from("expense_categories")
     .insert({
-      product_id,
-      quantity,
-      total_cost,
-      date: date || new Date().toISOString().split("T")[0],
+      name: name.trim(),
       user_id: user.id,
     })
     .select()
     .single();
 
-  if (error)
+  if (error) {
+    // Handle unique constraint error
+    if (error.code === "23505") {
+      return NextResponse.json(
+        { error: "Category already exists" },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   return NextResponse.json(data, { status: 201 });
 }
@@ -94,24 +103,33 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
-  const { id, product_id, quantity, total_cost, date } = body;
+  const { id, name } = body;
 
   if (!id)
-    return NextResponse.json({ error: "Missing purchase ID" }, { status: 400 });
+    return NextResponse.json({ error: "Missing category ID" }, { status: 400 });
+
+  if (!name || !name.trim()) {
+    return NextResponse.json(
+      { error: "Category name is required" },
+      { status: 400 }
+    );
+  }
 
   const { error } = await supabase
-    .from("purchases")
-    .update({
-      product_id,
-      quantity,
-      total_cost,
-      date,
-    })
+    .from("expense_categories")
+    .update({ name: name.trim() })
     .eq("id", id)
     .eq("user_id", user.id);
 
-  if (error)
+  if (error) {
+    if (error.code === "23505") {
+      return NextResponse.json(
+        { error: "Category name already exists" },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   return NextResponse.json({ success: true });
 }
@@ -126,10 +144,10 @@ export async function DELETE(request: NextRequest) {
   const { id } = body;
 
   if (!id)
-    return NextResponse.json({ error: "Missing purchase ID" }, { status: 400 });
+    return NextResponse.json({ error: "Missing category ID" }, { status: 400 });
 
   const { error } = await supabase
-    .from("purchases")
+    .from("expense_categories")
     .delete()
     .eq("id", id)
     .eq("user_id", user.id);

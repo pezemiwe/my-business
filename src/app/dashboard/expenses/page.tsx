@@ -120,7 +120,6 @@ export default function ExpensesPage() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch categories
       const { data: catData, error: catError } = await supabase
         .from("expense_categories")
         .select("id, name")
@@ -130,7 +129,6 @@ export default function ExpensesPage() {
       if (catError) showError(catError.message);
       else setCategories(catData || []);
 
-      // Fetch expenses
       const { data: expenseData, error: expenseError } = await supabase
         .from("expenses")
         .select(
@@ -140,8 +138,7 @@ export default function ExpensesPage() {
           amount,
           expense_date,
           category_id,
-          created_at,
-          expense_categories:category_id(name)
+          created_at
         `
         )
         .eq("user_id", user.id)
@@ -152,10 +149,15 @@ export default function ExpensesPage() {
         return;
       }
 
-      const formattedData = (expenseData || []).map((expense: any) => ({
-        ...expense,
-        category_name: expense.expense_categories?.name || "Uncategorized",
-      }));
+      const formattedData = (expenseData || []).map((expense: any) => {
+        const category = (catData || []).find(
+          (c) => c.id === expense.category_id
+        );
+        return {
+          ...expense,
+          category_name: category?.name || "Uncategorized",
+        };
+      });
 
       setExpenses(formattedData);
       setStats(calculateStats(formattedData));
@@ -187,6 +189,16 @@ export default function ExpensesPage() {
     showSuccess("Category added successfully");
     setNewCategoryName("");
     closeCategoryModal();
+
+    const { data: catData, error: catError } = await supabase
+      .from("expense_categories")
+      .select("id, name")
+      .eq("user_id", user.id)
+      .order("name", { ascending: true });
+
+    if (!catError) {
+      setCategories(catData || []);
+    }
   };
 
   const filtered = useMemo(() => {
@@ -232,15 +244,13 @@ export default function ExpensesPage() {
       return;
     }
 
-    const { error } = await supabase.from("expenses").insert([
-      {
-        description,
-        amount,
-        expense_date: expenseDate,
-        category_id: categoryId ? parseInt(categoryId) : null,
-        user_id: user.id,
-      },
-    ]);
+    const { error } = await supabase.from("expenses").insert({
+      description,
+      amount,
+      expense_date: expenseDate,
+      category_id: categoryId ? parseInt(categoryId) : null,
+      user_id: user.id,
+    });
 
     setLoading(false);
     if (error) return showError(error.message);
@@ -266,18 +276,20 @@ export default function ExpensesPage() {
           amount,
           expense_date,
           category_id,
-          created_at,
-          expense_categories:category_id(name)
+          created_at
         `
         )
         .eq("user_id", currentUser.id)
         .order("expense_date", { ascending: false });
 
       if (!expenseError) {
-        const formattedData = (expenseData || []).map((expense: any) => ({
-          ...expense,
-          category_name: expense.expense_categories?.name || "Uncategorized",
-        }));
+        const formattedData = (expenseData || []).map((expense: any) => {
+          const category = categories.find((c) => c.id === expense.category_id);
+          return {
+            ...expense,
+            category_name: category?.name || "Uncategorized",
+          };
+        });
         setExpenses(formattedData);
         setStats(calculateStats(formattedData));
       }
@@ -352,18 +364,20 @@ export default function ExpensesPage() {
           amount,
           expense_date,
           category_id,
-          created_at,
-          expense_categories:category_id(name)
+          created_at
         `
         )
         .eq("user_id", currentUser.id)
         .order("expense_date", { ascending: false });
 
       if (!expenseError) {
-        const formattedData = (expenseData || []).map((expense: any) => ({
-          ...expense,
-          category_name: expense.expense_categories?.name || "Uncategorized",
-        }));
+        const formattedData = (expenseData || []).map((expense: any) => {
+          const category = categories.find((c) => c.id === expense.category_id);
+          return {
+            ...expense,
+            category_name: category?.name || "Uncategorized",
+          };
+        });
         setExpenses(formattedData);
         setStats(calculateStats(formattedData));
       }

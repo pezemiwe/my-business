@@ -8,7 +8,6 @@ import {
   Divider,
   Table,
   Paper,
-  Button,
   Flex,
   Center,
   Stack,
@@ -21,25 +20,45 @@ import LoadingScreen from "@/components/loader/LoadingScreen";
 import CountUp from "react-countup";
 import { useEffect, useState } from "react";
 import { AlertCircle } from "lucide-react";
-import { showError, showSuccess } from "@/lib/notifications";
+import { greetings } from "@/lib/utils";
 
+// ✅ Interfaces
 interface Summary {
   label: string;
   value: number;
   color: string;
 }
 
-interface Transaction extends Summary {
+interface Transaction {
   date: string;
   type: string;
   item: string;
   amount: string;
 }
 
+// ✅ Explicit result types for Supabase queries
+interface SaleRow {
+  date: string;
+  total_sales: number;
+  products: { name: string }[] | { name: string } | null;
+}
+
+interface PurchaseRow {
+  date: string;
+  total_cost: number;
+  products: { name: string }[] | { name: string } | null;
+}
+
+interface ExpenseRow {
+  date: string;
+  description: string;
+  amount: number;
+}
+
 export default function DashboardPage() {
   const session = useUserSession(true);
   const [displayName, setDisplayName] = useState<string>("User");
-  const [summary, setSummary] = useState([
+  const [summary, setSummary] = useState<Summary[]>([
     { label: "Total Sales", value: 0, color: "green" },
     { label: "Total Purchases", value: 0, color: "yellow" },
     { label: "Total Expenses", value: 0, color: "red" },
@@ -47,8 +66,24 @@ export default function DashboardPage() {
   ]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [greeting, setGreeting] = useState("");
 
+  // Greeting logic
+  useEffect(() => {
+    const hour = new Date().getHours();
+    const timeOfDay: keyof typeof greetings =
+      hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
+
+    const messages = greetings[timeOfDay];
+    const randomMsg = messages[Math.floor(Math.random() * messages.length)];
+    const finalGreeting = randomMsg.replace("{name}", displayName || "Boss");
+
+    sessionStorage.setItem("greeting", finalGreeting);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setGreeting(finalGreeting);
+  }, [displayName]);
+
+  // Fetch display name
   useEffect(() => {
     const fetchName = async () => {
       const cached = localStorage.getItem("display_name");
@@ -78,21 +113,23 @@ export default function DashboardPage() {
     fetchName();
   }, []);
 
+  // Fetch summary + recent transactions
   useEffect(() => {
     if (!session) return;
 
     const fetchSummary = async () => {
       setLoading(true);
 
-      const { data, error } = await supabase
+      // --- Profit summary ---
+      const { data: summaryData, error: summaryError } = await supabase
         .from("profit_summary")
         .select("total_sales, total_purchases, total_expenses, net_profit, day")
         .eq("user_id", session.user.id)
         .order("day", { ascending: false })
         .limit(1);
 
-      if (!error && data?.[0]) {
-        const s = data[0];
+      if (!summaryError && summaryData?.[0]) {
+        const s = summaryData[0];
         setSummary([
           { label: "Total Sales", value: s.total_sales || 0, color: "green" },
           {
@@ -109,58 +146,98 @@ export default function DashboardPage() {
         ]);
       }
 
-      const { data: sales } = await supabase
+      // --- Sales ---
+      const { data: sales } = (await supabase
         .from("sales")
-        .select("date, quantity, total_sales")
+        .select(
+          `
+          date,
+          total_sales,
+          products (
+            name
+          )
+        `
+        )
         .eq("user_id", session.user.id)
         .order("date", { ascending: false })
-        .limit(5);
+        .limit(5)) as { data: SaleRow[] | null };
 
-      const tx = (sales || []).map((s) => ({
-        date: s.date,
-        type: "Sale",
-        item: "Product",
-        amount: `₦${s.total_sales?.toLocaleString()}`,
-      })) as Transaction[];
+      // --- Purchases ---
+      const { data: purchases } = (await supabase
+        .from("purchases")
+        .select(
+          `
+          date,
+          total_cost,
+          products (
+            name
+          )
+        `
+        )
+        .eq("user_id", session.user.id)
+        .order("date", { ascending: false })
+        .limit(5)) as { data: PurchaseRow[] | null };
 
-      setTransactions(tx);
+      // --- Expenses ---
+      const { data: expenses } = (await supabase
+        .from("expenses")
+        .select("date, description, amount")
+        .eq("user_id", session.user.id)
+        .order("date", { ascending: false })
+        .limit(5)) as { data: ExpenseRow[] | null };
+
+      // --- Normalize all transactions ---
+      const allTx: Transaction[] = [
+        ...(sales || []).map((s) => ({
+          date: s.date,
+          type: "Sale",
+          item: Array.isArray(s.products)
+            ? s.products[0]?.name || "—"
+            : s.products?.name || "—",
+          amount: `₦${Number(s.total_sales || 0).toLocaleString()}`,
+        })),
+        ...(purchases || []).map((p) => ({
+          date: p.date,
+          type: "Purchase",
+          item: Array.isArray(p.products)
+            ? p.products[0]?.name || "—"
+            : p.products?.name || "—",
+          amount: `₦${Number(p.total_cost || 0).toLocaleString()}`,
+        })),
+        ...(expenses || []).map((e) => ({
+          date: e.date,
+          type: "Expense",
+          item: e.description || "—",
+          amount: `₦${Number(e.amount || 0).toLocaleString()}`,
+        })),
+      ];
+
+      // Sort newest first
+      const sorted = allTx
+        .filter((t) => t.date)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 5);
+
+      setTransactions(sorted);
       setLoading(false);
     };
 
     fetchSummary();
   }, [session]);
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    const { data, error } = await supabase.rpc("manual_refresh_profit_data");
-
-    if (error) {
-      showError(error.message);
-    } else {
-      showSuccess(data ?? "Profit summaries updated!");
-    }
-    setRefreshing(false);
-  };
-
   if (loading) return <LoadingScreen message="Preparing your dashboard..." />;
 
+  // --- Render ---
   return (
     <Container size="xl" py="lg">
       <Stack gap="lg">
         <Flex justify="space-between" align="center">
-          <Title order={2} c="brand.6">
-            Welcome back, {displayName}!
+          <Title order={4} c="brand.6">
+            {greeting}
           </Title>
-          <Button
-            loading={refreshing}
-            onClick={handleRefresh}
-            color="teal"
-            variant="light"
-          >
-            🔄 Refresh Data
-          </Button>
         </Flex>
 
+        {/* Summary Cards */}
         <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
           {summary.map((stat) => (
             <Card
@@ -189,6 +266,7 @@ export default function DashboardPage() {
           ))}
         </SimpleGrid>
 
+        {/* Recent Transactions */}
         <Paper shadow="sm" radius="md" p="lg" withBorder>
           <Group justify="space-between" mb="sm">
             <Title order={4}>Recent Transactions</Title>
@@ -210,7 +288,17 @@ export default function DashboardPage() {
                   {transactions.map((t, i) => (
                     <Table.Tr key={i}>
                       <Table.Td>{t.date}</Table.Td>
-                      <Table.Td>{t.type}</Table.Td>
+                      <Table.Td
+                        c={
+                          t.type === "Sale"
+                            ? "green"
+                            : t.type === "Purchase"
+                            ? "yellow.8"
+                            : "red"
+                        }
+                      >
+                        {t.type}
+                      </Table.Td>
                       <Table.Td>{t.item}</Table.Td>
                       <Table.Td fw={600}>{t.amount}</Table.Td>
                     </Table.Tr>

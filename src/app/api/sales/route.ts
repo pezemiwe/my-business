@@ -33,7 +33,16 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase
     .from("sales")
     .select(
-      "id, product_name, quantity, unit_price, total_sales, date, created_at"
+      `
+    id,
+    quantity,
+    total_sales,
+    date,
+    created_at,
+    products (
+      name
+    )
+  `
     )
     .eq("user_id", user.id)
     .order("date", { ascending: false });
