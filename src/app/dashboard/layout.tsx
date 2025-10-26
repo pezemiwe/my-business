@@ -28,7 +28,6 @@ export default function DashboardLayout({
   const router = useRouter();
   const [displayName, setDisplayName] = useState<string>("User");
 
-  // 🔹 Fetch display name on load
   useEffect(() => {
     const fetchName = async () => {
       const cached = localStorage.getItem("display_name");
@@ -62,7 +61,7 @@ export default function DashboardLayout({
     try {
       await supabase.auth.signOut();
       localStorage.removeItem("display_name");
-      showSuccess("You’ve been logged out safely.");
+      showSuccess("You've been logged out safely.");
       router.replace("/login");
       close();
     } catch (err: any) {
@@ -78,6 +77,10 @@ export default function DashboardLayout({
     { label: "💸 Expenses", href: "/dashboard/expenses" },
     { label: "📈 Reports", href: "/dashboard/reports" },
   ];
+
+  const handleNavClick = () => {
+    close();
+  };
 
   return (
     <AppShell
@@ -155,6 +158,7 @@ export default function DashboardLayout({
               <Link
                 key={link.href}
                 href={link.href}
+                onClick={handleNavClick}
                 style={{
                   textDecoration: "none",
                   backgroundColor: active
@@ -171,7 +175,6 @@ export default function DashboardLayout({
           })}
         </nav>
 
-        {/* Mobile logout button */}
         <div className="mt-6 pt-4 border-t border-gray-200 md:hidden">
           <Button
             fullWidth
@@ -186,7 +189,14 @@ export default function DashboardLayout({
         </div>
       </AppShell.Navbar>
 
-      <AppShell.Main>{children}</AppShell.Main>
+      <AppShell.Main
+        style={{
+          paddingLeft: 0,
+          paddingRight: 0,
+        }}
+      >
+        {children}
+      </AppShell.Main>
     </AppShell>
   );
 }

@@ -4,16 +4,16 @@ import {
   Card,
   Text,
   Title,
-  Grid,
   Group,
   Divider,
-  ScrollArea,
   Table,
   Paper,
   Button,
   Flex,
   Center,
   Stack,
+  Container,
+  SimpleGrid,
 } from "@mantine/core";
 import { useUserSession } from "@/lib/useUserSession";
 import { supabase } from "@/lib/supabaseClient";
@@ -22,6 +22,7 @@ import CountUp from "react-countup";
 import { useEffect, useState } from "react";
 import { AlertCircle } from "lucide-react";
 import { showError, showSuccess } from "@/lib/notifications";
+
 interface Summary {
   label: string;
   value: number;
@@ -47,6 +48,7 @@ export default function DashboardPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
   useEffect(() => {
     const fetchName = async () => {
       const cached = localStorage.getItem("display_name");
@@ -78,6 +80,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!session) return;
+
     const fetchSummary = async () => {
       setLoading(true);
 
@@ -142,26 +145,26 @@ export default function DashboardPage() {
   if (loading) return <LoadingScreen message="Preparing your dashboard..." />;
 
   return (
-    <div className="p-6">
-      <Flex justify="space-between" align="center" mb="md">
-        <Title order={2} c="brand.6">
-          Welcome back, {displayName}!
-        </Title>
-        <Button
-          loading={refreshing}
-          onClick={handleRefresh}
-          color="teal"
-          variant="light"
-        >
-          🔄 Refresh Data
-        </Button>
-      </Flex>
+    <Container size="xl" py="lg">
+      <Stack gap="lg">
+        <Flex justify="space-between" align="center">
+          <Title order={2} c="brand.6">
+            Welcome back, {displayName}!
+          </Title>
+          <Button
+            loading={refreshing}
+            onClick={handleRefresh}
+            color="teal"
+            variant="light"
+          >
+            🔄 Refresh Data
+          </Button>
+        </Flex>
 
-      {/* Summary Cards */}
-      <Grid mb="xl">
-        {summary.map((stat) => (
-          <Grid.Col key={stat.label} span={{ base: 12, sm: 3 }}>
+        <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
+          {summary.map((stat) => (
             <Card
+              key={stat.label}
               shadow="sm"
               radius="md"
               p="lg"
@@ -174,7 +177,7 @@ export default function DashboardPage() {
               <Text size="sm" c="dimmed">
                 {stat.label}
               </Text>
-              <Text fz="xl" fw={600}>
+              <Text fz="xl" fw={600} mt="xs">
                 <CountUp
                   end={Number(stat.value)}
                   prefix="₦"
@@ -183,53 +186,52 @@ export default function DashboardPage() {
                 />
               </Text>
             </Card>
-          </Grid.Col>
-        ))}
-      </Grid>
+          ))}
+        </SimpleGrid>
 
-      {/* Recent Transactions */}
-      <Paper shadow="sm" radius="md" p="lg" withBorder>
-        <Group justify="space-between" mb="sm">
-          <Title order={4}>Recent Transactions</Title>
-        </Group>
-        <Divider mb="md" />
+        <Paper shadow="sm" radius="md" p="lg" withBorder>
+          <Group justify="space-between" mb="sm">
+            <Title order={4}>Recent Transactions</Title>
+          </Group>
+          <Divider mb="md" />
 
-        {transactions.length > 0 ? (
-          <ScrollArea>
-            <Table striped highlightOnHover withTableBorder>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Date</Table.Th>
-                  <Table.Th>Type</Table.Th>
-                  <Table.Th>Item</Table.Th>
-                  <Table.Th>Amount</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {transactions.map((t, i) => (
-                  <Table.Tr key={i}>
-                    <Table.Td>{t.date}</Table.Td>
-                    <Table.Td>{t.type}</Table.Td>
-                    <Table.Td>{t.item}</Table.Td>
-                    <Table.Td fw={600}>{t.amount}</Table.Td>
+          {transactions.length > 0 ? (
+            <div style={{ overflowX: "auto" }}>
+              <Table striped highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Date</Table.Th>
+                    <Table.Th>Type</Table.Th>
+                    <Table.Th>Item</Table.Th>
+                    <Table.Th>Amount</Table.Th>
                   </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          </ScrollArea>
-        ) : (
-          <Center py="xl">
-            <Stack align="center" gap="xs">
-              <AlertCircle size={40} strokeWidth={1.2} color="gray" />
-              <Text fw={600}>No transactions yet</Text>
-              <Text size="sm" c="dimmed" ta="center">
-                Once you start recording sales, purchases, or expenses, they’ll
-                appear here.
-              </Text>
-            </Stack>
-          </Center>
-        )}
-      </Paper>
-    </div>
+                </Table.Thead>
+                <Table.Tbody>
+                  {transactions.map((t, i) => (
+                    <Table.Tr key={i}>
+                      <Table.Td>{t.date}</Table.Td>
+                      <Table.Td>{t.type}</Table.Td>
+                      <Table.Td>{t.item}</Table.Td>
+                      <Table.Td fw={600}>{t.amount}</Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </div>
+          ) : (
+            <Center py="xl">
+              <Stack align="center" gap="xs">
+                <AlertCircle size={40} strokeWidth={1.2} color="gray" />
+                <Text fw={600}>No transactions yet</Text>
+                <Text size="sm" c="dimmed" ta="center">
+                  Once you start recording sales, purchases, or expenses,
+                  they&apos;ll appear here.
+                </Text>
+              </Stack>
+            </Center>
+          )}
+        </Paper>
+      </Stack>
+    </Container>
   );
 }
